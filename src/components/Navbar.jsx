@@ -1,50 +1,30 @@
-import { Disclosure } from "@headlessui/react";
-import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
+// src/components/Navbar.jsx
 import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
-export default function Navbar() {
+const Navbar = () => {
+  const { user, logout } = useAuth();
+
   return (
-    <Disclosure as="nav" className="bg-primary">
-      {({ open }) => (
-        <>
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16">
-              <div className="flex items-center">
-                <Link to="/" className="text-white text-xl font-bold">
-                  QR Menu SaaS
-                </Link>
-              </div>
-              <div className="hidden md:flex space-x-4 items-center">
-                <Link to="/" className="text-white hover:text-gray-300">
-                  Home
-                </Link>
-                <Link to="/login" className="text-white hover:text-gray-300">
-                  Login
-                </Link>
-              </div>
-              <div className="flex md:hidden">
-                <Disclosure.Button className="text-white hover:text-gray-300">
-                  {open ? (
-                    <XMarkIcon className="h-6 w-6" />
-                  ) : (
-                    <Bars3Icon className="h-6 w-6" />
-                  )}
-                </Disclosure.Button>
-              </div>
-            </div>
-          </div>
-          <Disclosure.Panel className="md:hidden bg-primary">
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              <Link to="/" className="text-white block">
-                Home
-              </Link>
-              <Link to="/login" className="text-white block">
-                Login
-              </Link>
-            </div>
-          </Disclosure.Panel>
-        </>
-      )}
-    </Disclosure>
+    <nav className="bg-gray-800 text-white px-4 py-3 flex justify-between items-center">
+      <Link to="/" className="text-xl font-bold">
+        QR Menu
+      </Link>
+      <div className="space-x-4">
+        {!user ? (
+          <>
+            <Link to="/login" className="hover:underline">Login</Link>
+            <Link to="/register" className="hover:underline">Register</Link>
+          </>
+        ) : (
+          <>
+            <span>{user.email}</span>
+            <button onClick={logout} className="bg-red-500 px-2 py-1 rounded">Logout</button>
+          </>
+        )}
+      </div>
+    </nav>
   );
-}
+};
+
+export default Navbar;

@@ -1,97 +1,109 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import API_BASE_URL from "../api/api.config";
-import { useCart } from "../context/CartContext";
+import { useParams, useNavigate } from "react-router-dom";
+import api from "../api/api.config";
+import { toast } from "react-toastify";
+import CategorySection from "../components/CategorySection";
+import CustomerNavbar from "../components/CustomerNavbar";
 
 const CustomerMenu = () => {
-  const { slug } = useParams(); 
+  const { slug } = useParams();
+  const navigate = useNavigate();
+
+  const [restaurant, setRestaurant] = useState(null);
+  const [categories, setCategories] = useState([]);
   const [dishes, setDishes] = useState([]);
-  const [grouped, setGrouped] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const { addItem, cart } = useCart();
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [cart, setCart] = useState(() => {
+    return JSON.parse(localStorage.getItem("cart")) || [];
+  });
 
   useEffect(() => {
     const fetchMenu = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/restaurant/menu/slug/${slug}`);
-        if (!response.ok) throw new Error("Failed to fetch");
-        const data = await response.json();
-        if (!Array.isArray(data)) throw new Error("Invalid format");
-        setDishes(data);
+        const res = await api.get(`/menu/${slug}/items`);
+        setRestaurant(res.data.restaurant);
+        setCategories(res.data.categories);
+        setDishes(res.data.dishes);
       } catch (err) {
-        console.error("Error:", err);
-        setError("Failed to load menu. Please try again.");
+        console.error("Menu fetch error:", err.response || err);
+        toast.error("Failed to load menu");
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
     fetchMenu();
   }, [slug]);
 
-  useEffect(() => {
-    const groupedByCategory = {};
-    dishes.forEach(dish => {
-      const category = dish?.categoryId?.name || "Uncategorized";
-      if (!groupedByCategory[category]) groupedByCategory[category] = [];
-      groupedByCategory[category].push(dish);
-    });
-    setGrouped(groupedByCategory);
-  }, [dishes]);
+  const addToCart = (dish) => {
+    const updatedCart = [...cart];
+    const existingItem = updatedCart.find((item) => item.dishId === dish._id);
 
-  if (loading) return <p className="text-center mt-10">Loading menu...</p>;
-  if (error) return <p className="text-center text-red-600 mt-10">{error}</p>;
+    if (existingItem) {
+      existingItem.quantity += 1;
+    } else {
+      updatedCart.push({
+        dishId: dish._id,
+        name: dish.name,
+        price: dish.price,
+        imageUrl: dish.image,
+        quantity: 1,
+      });
+    }
+
+    setCart(updatedCart);
+    localStorage.setItem("cart", JSON.stringify(updatedCart));
+    toast.success(`${dish.name} added to cart`);
+  };
+
+  const goToCart = () => {
+    navigate(`/menu/${slug}/cart`);
+  };
 
   return (
-    <div className="p-4 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold text-center mb-6">Restaurant Menu</h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white relative overflow-visible">
+      {/* Navbar */}
+      <CustomerNavbar restaurant={slug} />
 
-      {Object.keys(grouped).length === 0 && (
-        <p className="text-center text-gray-500">No dishes available.</p>
-      )}
+      {/* Main Content */}
+      <div className="w-full px-4 sm:px-8 lg:px-12 py-8">
+        {/* Restaurant Name */}
+        <h2 className="text-3xl sm:text-4xl font-extrabold text-center mb-10 text-indigo-400">
+          {restaurant?.name ? `${restaurant.name} Menu` : "Menu"}
+        </h2>
 
-      {Object.entries(grouped).map(([category, items]) => (
-        <div key={category} className="mb-8">
-          <h2 className="text-xl font-semibold mb-2">{category}</h2>
-          <ul className="space-y-3">
-            {items.map(dish => (
-              <li
-                key={dish._id}
-                className="p-4 bg-white rounded shadow-sm flex justify-between items-center"
+        {/* Loading State */}
+        {isLoading ? (
+          <p className="text-gray-400 text-center">Loading menu...</p>
+        ) : categories.length === 0 ? (
+          <p className="text-gray-400 text-center">No categories available</p>
+        ) : (
+          <div className="space-y-10">
+            {categories.map((cat) => (
+              <div
+                key={cat._id}
+                className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl p-6 border border-white/10 w-full"
               >
-                <div className="w-3/4">
-                  <h3 className="font-semibold">{dish.name}</h3>
-                  <p className="text-sm text-gray-600">{dish.description}</p>
-                  <p className="text-blue-600 font-bold">${dish.price}</p>
-                </div>
-                <div className="text-right">
-                  {dish.image && (
-                    <img
-                      src={dish.image}
-                      alt={dish.name}
-                      className="w-20 h-20 object-cover rounded mb-2"
-                    />
-                  )}
-                  <button
-                    onClick={() => addItem(dish)}
-                    className="bg-green-600 text-white px-3 py-1 rounded text-sm"
-                  >
-                    Add to Cart
-                  </button>
-                </div>
-              </li>
+                <CategorySection
+                  category={cat}
+                  dishes={dishes.filter((d) => d.category === cat._id)}
+                  addToCart={addToCart}
+                />
+              </div>
             ))}
-          </ul>
-        </div>
-      ))}
+          </div>
+        )}
+      </div>
 
+      {/* Floating Cart Button */}
       {cart.length > 0 && (
-        <div className="fixed bottom-4 left-0 right-0 text-center">
-          <Link to={`/menu/${slug}/cart`}>
-            <button className="bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg">
-              View Cart ({cart.reduce((sum, item) => sum + item.qty, 0)})
-            </button>
-          </Link>
+        <div className="fixed bottom-6 right-6 z-[9999]">
+          <button
+            className="flex items-center gap-3 px-6 py-3 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 shadow-xl hover:scale-105 transition-transform text-white font-semibold"
+            onClick={goToCart}
+          >
+            View Cart ({cart.reduce((acc, item) => acc + item.quantity, 0)})
+          </button>
         </div>
       )}
     </div>

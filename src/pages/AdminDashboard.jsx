@@ -1,147 +1,73 @@
-import { useEffect, useState } from "react";
-import API_BASE_URL from "../api/api.config";
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import AdminNavbar from "../components/AdminNavbar";
+import { UtensilsCrossed, Users } from "lucide-react"; // Icons
 
 const AdminDashboard = () => {
-  const [restaurants, setRestaurants] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const [editingId, setEditingId] = useState(null);
-  const token = localStorage.getItem("token");
-
-  const fetchData = async () => {
-    const rRes = await fetch(`${API_BASE_URL}/admin/restaurants`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const cRes = await fetch(`${API_BASE_URL}/admin/customers`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setRestaurants(await rRes.json());
-    setCustomers(await cRes.json());
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const { name, email, password } = form;
-    if (!name || !email || (!editingId && !password)) {
-      alert("All fields are required");
-      return;
-    }
-
-    const method = editingId ? "PUT" : "POST";
-    const url = editingId
-      ? `${API_BASE_URL}/admin/restaurant/${editingId}`
-      : `${API_BASE_URL}/admin/restaurant`;
-
-    const res = await fetch(url, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(form),
-    });
-
-    if (res.ok) {
-      setForm({ name: "", email: "", password: "" });
-      setEditingId(null);
-      fetchData();
-    } else {
-      alert("Operation failed");
-    }
-  };
-
-  const handleEdit = (rest) => {
-    setForm({ name: rest.name, email: rest.email, password: "" });
-    setEditingId(rest._id);
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this restaurant?")) return;
-    await fetch(`${API_BASE_URL}/admin/restaurant/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    fetchData();
-  };
+  const navigate = useNavigate();
 
   return (
-    <>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
       <AdminNavbar />
-      <div className="p-4 max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold mb-4">Manage Restaurants</h1>
-        <form onSubmit={handleSubmit} className="grid gap-4 mb-6 grid-cols-1 md:grid-cols-3">
-          <input
-            type="text"
-            placeholder="Restaurant Name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="border p-2 rounded"
-            required
-          />
-          <input
-            type="email"
-            placeholder="Email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="border p-2 rounded"
-            required
-          />
-          <input
-            type="password"
-            placeholder={editingId ? "New Password (optional)" : "Password"}
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            className="border p-2 rounded"
-            required={!editingId}
-          />
-          <button type="submit" className="bg-blue-600 text-white rounded px-4 py-2 col-span-full">
-            {editingId ? "Update Restaurant" : "Add Restaurant"}
-          </button>
-        </form>
 
-        <ul className="space-y-3 mb-10">
-          {restaurants.map((r) => (
-            <li
-              key={r._id}
-              className="bg-white shadow p-4 rounded flex justify-between items-center"
+      {/* Main Content */}
+      <main className="pt-24 px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl p-6 sm:p-10 max-w-6xl mx-auto"
+        >
+          {/* Heading */}
+          <h1 className="text-3xl sm:text-4xl font-extrabold mb-4 text-indigo-400">
+            Welcome to Admin Dashboard
+          </h1>
+          <p className="text-gray-300 text-lg mb-10">
+            Manage restaurants and customers easily from here.
+          </p>
+
+          {/* Action Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {/* Card 1 - Manage Restaurants */}
+            <motion.div
+              onClick={() => navigate("/admin/restaurants")}
+              className="p-6 bg-gray-900/40 rounded-xl shadow-lg cursor-pointer border border-gray-700 hover:border-indigo-500 hover:bg-gray-800/60 transition-all flex flex-col items-start gap-3"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.98 }}
             >
-              <div>
-                <h3 className="font-bold">{r.name}</h3>
-                <p className="text-sm text-gray-600">{r.email}</p>
+              <div className="bg-indigo-500/20 p-3 rounded-full">
+                <UtensilsCrossed className="w-6 h-6 text-indigo-400" />
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleEdit(r)}
-                  className="text-blue-600 hover:underline"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(r._id)}
-                  className="text-red-600 hover:underline"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+              <h2 className="text-xl font-semibold text-indigo-400">
+                Manage Restaurants
+              </h2>
+              <p className="text-gray-400 text-sm">
+                Add, edit, or remove restaurants from the platform.
+              </p>
+            </motion.div>
 
-        <h2 className="text-xl font-bold mb-2">All Customers</h2>
-        <ul className="space-y-2">
-          {customers.map((c) => (
-            <li key={c._id} className="border-b p-2">
-              {c.name} — {c.phone}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </>
+            {/* Card 2 - Manage Customers */}
+            <motion.div
+              onClick={() => navigate("/admin/customers")}
+              className="p-6 bg-gray-900/40 rounded-xl shadow-lg cursor-pointer border border-gray-700 hover:border-pink-500 hover:bg-gray-800/60 transition-all flex flex-col items-start gap-3"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <div className="bg-pink-500/20 p-3 rounded-full">
+                <Users className="w-6 h-6 text-pink-400" />
+              </div>
+              <h2 className="text-xl font-semibold text-pink-400">
+                Manage Customers
+              </h2>
+              <p className="text-gray-400 text-sm">
+                View and manage customer accounts easily.
+              </p>
+            </motion.div>
+          </div>
+        </motion.div>
+      </main>
+    </div>
   );
 };
 

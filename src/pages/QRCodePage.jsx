@@ -1,75 +1,49 @@
-import { useEffect, useState } from "react";
-import { QRCodeCanvas } from "qrcode.react";
-import API_BASE_URL from "../api/api.config";
-import RestaurantNavbar from "../components/RestaurantNavbar";
+import React from "react";
+import { useParams } from "react-router-dom";
+import QRCode from "react-qr-code";
 
 const QRCodePage = () => {
-  const [slug, setSlug] = useState("");
-  const [error, setError] = useState("");
-  const token = localStorage.getItem("token");
-
-  useEffect(() => {
-    const fetchSlug = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/restaurant/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        if (!data.slug) throw new Error("Slug missing in response");
-        setSlug(data.slug);
-      } catch (err) {
-        console.error("Slug fetch error:", err);
-        setError("Failed to load slug.");
-      }
-    };
-    fetchSlug();
-  }, []);
-
-  const menuURL = `${window.location.origin}/menu/${slug}`;
-
-  const handleDownload = () => {
-    const canvas = document.getElementById("qr-code");
-    const pngUrl = canvas
-      .toDataURL("image/png")
-      .replace("image/png", "image/octet-stream");
-    const link = document.createElement("a");
-    link.href = pngUrl;
-    link.download = "qr-menu.png";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  const { slug } = useParams();
+  const url = `${window.location.origin}/menu/${slug}`;
 
   return (
-    <>
-      <RestaurantNavbar />
-      <div className="p-4 text-center">
-        <h2 className="text-xl font-semibold mb-4">QR Code for Your Menu</h2>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white px-4">
+      <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl p-8 sm:p-12 w-full max-w-md text-center">
+        {/* Title */}
+        <h1 className="text-3xl font-bold mb-6 text-indigo-400">
+          Scan this QR Code
+        </h1>
 
-        {error && <p className="text-red-600">{error}</p>}
+        {/* QR Code */}
+        <div className="flex justify-center mb-6">
+          <div className="bg-gray-900/50 p-4 rounded-xl shadow-lg">
+            <QRCode value={url} size={200} />
+          </div>
+        </div>
 
-        {slug ? (
-          <>
-            <QRCodeCanvas
-              id="qr-code"
-              value={menuURL}
-              size={256}
-              level="H"
-              className="mx-auto"
-            />
-            <p className="mt-4">{menuURL}</p>
-            <button
-              onClick={handleDownload}
-              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded"
-            >
-              Download QR Code
-            </button>
-          </>
-        ) : (
-          !error && <p>Loading...</p>
-        )}
+        {/* URL Display */}
+        <p className="text-gray-300 text-sm mb-2">Share this link:</p>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="break-all text-indigo-400 hover:text-indigo-300 underline"
+        >
+          {url}
+        </a>
+
+        {/* Copy Button */}
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(url);
+            alert("Link copied to clipboard!");
+          }}
+          className="mt-6 w-full px-6 py-3 rounded-lg font-semibold bg-gradient-to-r from-indigo-500 to-purple-500 hover:scale-105 transition-transform shadow-lg"
+        >
+          Copy Link
+        </button>
       </div>
-    </>
+    </div>
   );
 };
 

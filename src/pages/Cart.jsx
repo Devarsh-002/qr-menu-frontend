@@ -1,127 +1,161 @@
-import { useCart } from "../context/CartContext";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
-import API_BASE_URL from "../api/api.config";
+import api from "../api/api.config";
+import { toast } from "react-toastify";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements } from "@stripe/react-stripe-js";
+import CheckoutForm from "../pages/CheckoutForm";
+import CustomerNavbar from "../components/CustomerNavbar";
+
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
 const Cart = () => {
   const { slug } = useParams();
-  const { cart, updateQty, removeItem, clearCart } = useCart();
-  const [restaurantId, setRestaurantId] = useState("");
-  const [customer, setCustomer] = useState({ name: "", phone: "" });
   const navigate = useNavigate();
+  const [cart, setCart] = useState([]);
+  const [clientSecret, setClientSecret] = useState("");
+  const [showPayment, setShowPayment] = useState(false);
+  const [totalAmount, setTotalAmount] = useState(0);
 
-  const total = cart.reduce((sum, item) => sum + item.qty * item.price, 0);
-
-  // Fetch restaurant ID by slug
   useEffect(() => {
-    const getId = async () => {
-      const res = await fetch(`${API_BASE_URL}/restaurant/menu/slug/${slug}`);
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        setRestaurantId(data[0].restaurantId);
-      }
-    };
-    getId();
-  }, [slug]);
+    const storedCart = JSON.parse(localStorage.getItem("cart")) || [];
+    setCart(storedCart);
 
-  const handleCheckout = async () => {
-    if (!customer.name || !customer.phone) {
-      return alert("Please enter your name and phone.");
-    }
+    const total = storedCart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    setTotalAmount(total.toFixed(2));
+  }, []);
 
-    try {
-      const res = await fetch(`${API_BASE_URL}/payment/create-checkout-session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cart,
-          customerInfo: customer,
-          slug,
-          restaurantId,
-        }),
-      });
-
-      const data = await res.json();
-      window.location.href = data.url;
-    } catch (err) {
-      console.error(err);
-      alert("Checkout failed");
-    }
+  const updateTotal = (updatedCart) => {
+    const total = updatedCart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    setTotalAmount(total.toFixed(2));
   };
 
-  return (
-    <div className="p-4 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Your Cart</h1>
+  const handleQuantityChange = (dishId, delta) => {
+    const updated = cart.map((item) =>
+      item.dishId === dishId
+        ? { ...item, quantity: Math.max(1, item.quantity + delta) }
+        : item
+    );
+    setCart(updated);
+    localStorage.setItem("cart", JSON.stringify(updated));
+    updateTotal(updated);
+  };
 
-      {cart.length === 0 ? (
-        <p className="text-gray-500">Your cart is empty.</p>
-      ) : (
-        <>
-          <ul className="space-y-4 mb-6">
-            {cart.map((item) => (
-              <li
-                key={item._id}
-                className="p-3 bg-white shadow-sm rounded flex justify-between items-center"
-              >
-                <div>
-                  <h3 className="font-semibold">{item.name}</h3>
-                  <p className="text-sm text-gray-500">
-                    ${item.price} x {item.qty}
-                  </p>
-                  <p className="text-sm font-bold text-blue-600">
-                    ${item.price * item.qty}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <input
-                    type="number"
-                    min={1}
-                    value={item.qty}
-                    onChange={(e) => updateQty(item._id, parseInt(e.target.value))}
-                    className="border w-16 text-center p-1 rounded"
-                  />
+  const handleRemove = (dishId, name) => {
+    const updated = cart.filter((item) => item.dishId !== dishId);
+    setCart(updated);
+    localStorage.setItem("cart", JSON.stringify(updated));
+    updateTotal(updated);
+
+    toast.info(`${name} removed from cart`);
+  };
+
+  
+  if (showPayment && clientSecret) {
+    return (
+      <Elements stripe={stripePromise} options={{ clientSecret }}>
+        <CheckoutForm cart={cart} slug={slug} totalAmount={totalAmount} />
+      </Elements>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
+      <CustomerNavbar restaurant={slug} />
+
+      <div className="w-full px-4 py-6 sm:px-8 sm:py-10 max-w-6xl mx-auto">
+        <h2 className="text-3xl font-bold mb-8 text-center text-indigo-400">
+          Your Cart
+        </h2>
+
+        {cart.length === 0 ? (
+          <div className="text-center text-gray-400 text-lg mt-12">
+            <p className="mb-6">Your cart is empty.</p>
+            <button
+              onClick={() => navigate(`/menu/${slug}`)}
+              className="px-6 py-3 rounded-lg font-semibold bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:scale-105 transition-transform shadow-lg text-white"
+            >
+              Browse Menu
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Cart Items */}
+            <ul className="space-y-6 max-w-4xl mx-auto">
+              {cart.map((item) => (
+                <li
+                  key={item.dishId}
+                  className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-lg p-5 flex flex-col sm:flex-row items-center justify-between border border-white/10 transition-transform hover:scale-[1.02]"
+                >
+                  {/* Dish Info */}
+                  <div className="flex items-center gap-4 w-full sm:w-auto">
+                    {item.imageUrl ? (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        className="w-20 h-20 object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 bg-gray-700 rounded-lg flex items-center justify-center text-gray-400 text-sm">
+                        No Image
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="text-lg font-semibold text-white">
+                        {item.name}
+                      </h4>
+                      <p className="text-gray-300 text-sm">
+                        ${item.price.toFixed(2)} × {item.quantity}
+                      </p>
+
+                      {/* Quantity Controls */}
+                      <div className="flex gap-3 mt-2">
+                        <button
+                          onClick={() => handleQuantityChange(item.dishId, -1)}
+                          disabled={item.quantity === 1}
+                          className={`w-8 h-8 rounded-full bg-gray-800 text-gray-300 hover:bg-gray-700 transition ${
+                            item.quantity === 1 ? "opacity-50 cursor-not-allowed" : ""
+                          }`}
+                        >
+                          -
+                        </button>
+                        <span className="text-white">{item.quantity}</span>
+                        <button
+                          onClick={() => handleQuantityChange(item.dishId, 1)}
+                          className="w-8 h-8 rounded-full bg-gray-800 text-gray-300 hover:bg-gray-700 transition hover:scale-105"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Remove Button */}
                   <button
-                    onClick={() => removeItem(item._id)}
-                    className="text-red-600 text-sm mt-1"
+                    onClick={() => handleRemove(item.dishId, item.name)}
+                    className="mt-4 sm:mt-0 text-red-400 hover:text-red-300 font-semibold transition hover:scale-105"
                   >
                     Remove
                   </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
 
-          <div className="mb-6 text-right">
-            <p className="text-lg font-bold">Total: ${total.toFixed(2)}</p>
-          </div>
-
-          <div className="grid gap-4 mb-6">
-            <input
-              type="text"
-              placeholder="Your name"
-              value={customer.name}
-              onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
-              className="border p-2 rounded"
-              required
-            />
-            <input
-              type="tel"
-              placeholder="Phone number"
-              value={customer.phone}
-              onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
-              className="border p-2 rounded"
-              required
-            />
-          </div>
-
-          <button
-            onClick={handleCheckout}
-            className="w-full bg-green-600 text-white py-3 rounded font-semibold"
-          >
-            Pay & Place Order
-          </button>
-        </>
-      )}
+            {/* Sticky Cart Summary */}
+            <div className="sticky bottom-0 bg-gray-900/70 backdrop-blur-lg border-t border-gray-700 mt-10 p-6 flex flex-col sm:flex-row items-center justify-between max-w-4xl mx-auto rounded-t-2xl">
+              <p className="text-xl font-bold text-white">
+                Total: ${totalAmount}
+              </p>
+              <button
+                onClick={() => navigate(`/menu/${slug}/checkout`)}
+                className="mt-4 sm:mt-0 px-8 py-3 rounded-lg font-semibold bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:scale-105 transition-transform shadow-lg text-white"
+              >
+                Proceed to Checkout
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };

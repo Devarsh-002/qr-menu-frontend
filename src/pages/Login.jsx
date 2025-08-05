@@ -1,84 +1,128 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import API_BASE_URL from "../api/api.config";
+import { toast } from "react-toastify";
+import api from "../api/api.config";
 
 const Login = () => {
-  const [role, setRole] = useState("admin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [selectedRole, setSelectedRole] = useState("admin");
+  const [loading, setLoading] = useState(false);
+
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleRoleChange = (e) => {
+    setSelectedRole(e.target.value);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const endpoint = role === "admin" ? "admin" : "restaurant";
+    setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/${endpoint}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      const loginEndpoint =
+        selectedRole === "admin" ? "/admin/login" : "/restaurant/login";
 
-      const data = await res.json();
+      const res = await api.post(loginEndpoint, form);
+      const { token, slug } = res.data;
 
-      if (res.ok && data.token) {
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("role", role);
+      if (!token) {
+        toast.error("Invalid login response");
+        return;
+      }
 
-        // ✅ Extract and store restaurantId from JWT
-        const payload = JSON.parse(atob(data.token.split('.')[1]));
-        if (role === "restaurant") {
-          localStorage.setItem("restaurantId", payload.id);
-        }
+      localStorage.setItem("token", token);
 
-        navigate(role === "admin" ? "/admin" : "/restaurant");
+      if (selectedRole === "admin") {
+        localStorage.setItem("role", "superadmin");
+        toast.success("Admin login successful!");
+        navigate("/admin");
       } else {
-        alert(data.message || "Login failed");
+        localStorage.setItem("role", "restaurant");
+        if (slug) localStorage.setItem("slug", slug);
+        toast.success("Restaurant login successful!");
+        navigate("/restaurant");
       }
     } catch (err) {
-      alert("Login request failed");
-      console.error(err);
+      toast.error(err.response?.data?.message || "Login failed");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="p-4 max-w-md mx-auto mt-10">
-      <h2 className="text-2xl font-semibold text-center mb-6">Login</h2>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 px-4">
+      <div className="w-full max-w-md bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-6 sm:p-8">
+        {/* Title */}
+        <h2 className="text-3xl font-bold text-center text-white mb-6">
+          Admin / Restaurant Login
+        </h2>
 
-      <div className="flex gap-4 justify-center mb-4">
-        {["admin", "restaurant"].map(r => (
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Role Selector */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Login as:
+            </label>
+            <select
+              value={selectedRole}
+              onChange={handleRoleChange}
+              className="w-full px-4 py-3 rounded-lg bg-gray-900/40 border border-gray-600 text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            >
+              <option value="admin">Admin</option>
+              <option value="restaurant">Restaurant</option>
+            </select>
+          </div>
+
+          {/* Email */}
+          <input
+            type="email"
+            name="email"
+            placeholder="Email"
+            value={form.email}
+            onChange={handleChange}
+            required
+            className="w-full px-4 py-3 rounded-lg bg-gray-900/40 border border-gray-600 text-gray-200 placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          />
+
+          {/* Password */}
+          <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            value={form.password}
+            onChange={handleChange}
+            required
+            className="w-full px-4 py-3 rounded-lg bg-gray-900/40 border border-gray-600 text-gray-200 placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          />
+
+          {/* Submit */}
           <button
-            key={r}
-            onClick={() => setRole(r)}
-            className={`px-4 py-2 rounded ${role === r ? "bg-blue-600 text-white" : "bg-gray-200"}`}
+            type="submit"
+            disabled={loading}
+            className={`w-full py-3 rounded-lg bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-semibold hover:scale-105 transition-transform shadow-lg ${
+              loading ? "opacity-70 cursor-not-allowed" : ""
+            }`}
           >
-            {r.charAt(0).toUpperCase() + r.slice(1)}
+            {loading ? "Logging in..." : "Login"}
           </button>
-        ))}
-      </div>
+        </form>
 
-      <form onSubmit={handleLogin} className="space-y-4">
-        <input
-          className="w-full border p-2 rounded"
-          type="email"
-          placeholder="Email"
-          onChange={e => setEmail(e.target.value)}
-          required
-        />
-        <input
-          className="w-full border p-2 rounded"
-          type="password"
-          placeholder="Password"
-          onChange={e => setPassword(e.target.value)}
-          required
-        />
-        <button
-          type="submit"
-          className="bg-blue-600 text-white px-4 py-2 rounded w-full"
-        >
-          Login
-        </button>
-      </form>
+        {/* Customer Redirect */}
+        <p className="mt-6 text-center text-gray-300 text-sm">
+          Are you a customer?{" "}
+          <a
+            href="/customer/login"
+            className="text-indigo-400 hover:text-indigo-300 font-medium"
+          >
+            Login here
+          </a>
+        </p>
+      </div>
     </div>
   );
 };
